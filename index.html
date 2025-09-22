@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>Golf Scorer — Realtime Rooms</title>
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Firebase (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="logo">⛳</span>
+      <h1>Golf Scorer</h1>
+    </div>
+    <div class="header-actions">
+      <button id="btnDark" class="icon" title="Toggle theme">🌗</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- CONNECT / ROOM -->
+    <section id="connectView" class="card">
+      <div class="card-head">
+        <h2>🔌 Connect</h2>
+        <p class="muted">Paste your Firebase config (Console → Project settings → Web app). Saved locally in your browser.</p>
+      </div>
+      <textarea id="firebaseJson" rows="6" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"...","appId":"..."}'></textarea>
+      <div class="row gap">
+        <button id="saveConfig" class="btn primary">Save Config</button>
+        <button id="clearConfig" class="btn danger">Clear Config</button>
+      </div>
+      <hr/>
+      <h3>Room</h3>
+      <div class="grid two">
+        <label>Room code
+          <input id="roomCode" placeholder="ex: LAKEVIEW-0930" />
+        </label>
+        <label>Room PIN (optional)
+          <input id="roomPin" placeholder="ex: 2468" />
+        </label>
+      </div>
+      <div class="row gap">
+        <button id="createRoom" class="btn primary">Create Room</button>
+        <button id="joinRoom" class="btn">Join Room</button>
+      </div>
+      <p class="muted small">Tip: Each group uses a different room code. Share it so others can join.</p>
+    </section>
+
+    <!-- GAME SELECT -->
+    <section id="gameSelectView" class="card hidden">
+      <div class="card-head">
+        <h2>🎮 Choose Game Mode</h2>
+        <button id="btnRules" class="link">How to play & scoring</button>
+      </div>
+      <div class="game-cards">
+        <div class="game-card" data-game="stroke">
+          <div class="tag">Classic</div>
+          <h3>Stroke Play</h3>
+          <p class="muted">Lowest total strokes wins. Simple. Brutal. Honest.</p>
+        </div>
+        <div class="game-card" data-game="stableford">
+          <div class="tag gold">Points</div>
+          <h3>Stableford</h3>
+          <p class="muted">Score points by outplaying par. Birdies beat bogeys.</p>
+        </div>
+        <div class="game-card" data-game="skins">
+          <div class="tag red">Skins</div>
+          <h3>Skins</h3>
+          <p class="muted">Win the hole outright to take the skin. Ties carry.</p>
+        </div>
+        <div class="game-card" data-game="wolf">
+          <div class="tag">Wolf</div>
+          <h3>Wolf</h3>
+          <p class="muted">Rotate the Wolf. Team up or go lone wolf for extra points.</p>
+        </div>
+      </div>
+      <div class="row gap right">
+        <button id="continueSetup" class="btn primary" disabled>Continue</button>
+      </div>
+    </section>
+
+    <!-- SETUP ROUND -->
+    <section id="setupView" class="card hidden">
+      <div class="card-head">
+        <h2>⚙️ New Round</h2>
+        <div class="row gap">
+          <button id="btnBackGame" class="btn subtle">← Change Game</button>
+          <button id="leaveRoom" class="btn danger">Leave Room</button>
+        </div>
+      </div>
+      <div class="grid four">
+        <label>Event name
+          <input id="eventName" placeholder="Saturday Skins @ Lakeview (no sandbagging 🏖️)" />
+        </label>
+        <label>Course
+          <input id="courseName" placeholder="Course name" />
+        </label>
+        <label>Holes
+          <select id="numHoles">
+            <option value="9">9</option>
+            <option value="18" selected>18</option>
+          </select>
+        </label>
+        <label>Game type
+          <input id="gameTypeDisplay" disabled />
+        </label>
+      </div>
+
+      <details class="par-details">
+        <summary>Par by hole (optional)</summary>
+        <div id="parInputs" class="par-grid"></div>
+      </details>
+
+      <h3>Players</h3>
+      <div id="players" class="players"></div>
+      <div class="row">
+        <input id="playerName" placeholder="Add player name (first name is fine)" />
+        <button id="addPlayer" class="btn">Add</button>
+      </div>
+
+      <div class="row gap">
+        <button id="startRound" class="btn primary">Start Round</button>
+      </div>
+      <p class="muted small">Room: <span id="roomLabel"></span></p>
+    </section>
+
+    <!-- SCORING -->
+    <section id="scoringView" class="card hidden">
+      <div class="round-header">
+        <div>
+          <h2 id="roundTitle">Round</h2>
+          <div id="roundMeta" class="muted"></div>
+        </div>
+        <div class="row gap">
+          <button id="btnLeaderboard" class="btn">Leaderboard</button>
+          <button id="btnScorecard" class="btn primary">Scorecard</button>
+        </div>
+      </div>
+
+      <div id="navHoles" class="nav-holes"></div>
+      <div id="scoreTableWrap" class="table-wrap"></div>
+
+      <div class="row gap wrap">
+        <button id="prevHole" class="btn">◀︎ Prev</button>
+        <button id="nextHole" class="btn primary">Next ▶︎</button>
+        <button id="finishRound" class="btn success">Finish Round</button>
+        <button id="exportCSV" class="btn">Export CSV</button>
+        <button id="resetScores" class="btn danger">Reset Scores</button>
+      </div>
+
+      <section id="leaderboard" class="leaderboard"></section>
+
+      <section id="progressPanel" class="progress card thin">
+        <div class="row space">
+          <h3>📈 Game Progress — <span id="progressTitle">Hole</span></h3>
+          <span id="progressSub" class="muted small"></span>
+        </div>
+        <div id="progressBody" class="progress-body"></div>
+      </section>
+    </section>
+  </main>
+
+  <!-- RULES MODAL -->
+  <dialog id="rulesModal">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>How to Play & Scoring</h3>
+        <button id="closeRules" class="icon">✕</button>
+      </div>
+      <div class="rules">
+        <div class="rule">
+          <h4>Stroke Play</h4>
+          <p>Count every stroke until the ball drops. Lowest total wins. Simple. Brutal. Honest.</p>
+        </div>
+        <div class="rule">
+          <h4>Stableford</h4>
+          <ul>
+            <li>Albatross: 5 pts</li>
+            <li>Eagle: 4 pts</li>
+            <li>Birdie: 3 pts</li>
+            <li>Par: 2 pts</li>
+            <li>Bogey: 1 pt</li>
+            <li>Double bogey or worse: 0 pts</li>
+          </ul>
+          <p>Highest points wins.</p>
+        </div>
+        <div class="rule">
+          <h4>Skins</h4>
+          <p>Each hole is worth 1 skin. Lowest <em>unique</em> score wins the skin. Ties carry to the next hole (worth more).</p>
+        </div>
+        <div class="rule">
+          <h4>Wolf</h4>
+          <p>Players rotate as the Wolf. The Wolf can team up or go Lone Wolf (double points). The Wolf/team with the lowest score wins the points.</p>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <footer>
+    <small>Built for quick weekend rounds. Realtime via Firebase. v2.0</small>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
